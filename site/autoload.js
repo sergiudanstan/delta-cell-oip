@@ -1,4 +1,4 @@
-// Opens the delta cell when the page loads: imports the scene once per browser, frames it, plays and presses START.
+// Opens the delta cell when the page loads: imports the scene once per browser and published version, frames it, plays and presses START.
 // The editor stays fully usable afterwards (Stop, E-STOP, edit the PLC program, run the project tests).
 (() => {
   const q = new URLSearchParams(location.search)
@@ -9,10 +9,18 @@
   addEventListener('load', async () => {
     if (!await until(() => window.__oip?.store && __oip.controller && __oip.view && __oip.importSceneText, 120000)) return
     const o = window.__oip
-    if (o.store.getState().projectName !== 'delta-cell') {
-      const text = await (await fetch(new URL('../delta-cell.scene.json', location.href))).text()
+    // import when this browser holds another project or an older published version of this one (a returning visitor
+    // after a republish); otherwise keep what is there, including the visitor's own edits
+    const text = await (await fetch(new URL('../delta-cell.scene.json', location.href), { cache: 'no-cache' })).text()
+    let h = 2166136261
+    for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619)
+    const ver = `${text.length}:${(h >>> 0).toString(16)}`
+    let seen = null
+    try { seen = localStorage.getItem('delta-cell/scene') } catch { /* private mode */ }
+    if (o.store.getState().projectName !== 'delta-cell' || seen !== ver) {
       const err = await o.importSceneText(text, 'delta-cell.scene.json')
       if (err) { console.warn('[delta] import refused:', err); return }
+      try { localStorage.setItem('delta-cell/scene', ver) } catch { /* private mode */ }
     }
     await until(() => { const c = document.querySelector('.viewport-cover'); return !c || c.classList.contains('ready') }, 90000)
     await sleep(1500)
