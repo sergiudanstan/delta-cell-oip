@@ -34,11 +34,20 @@ so the program is unchanged except for its comments.
 | Cartons | 250 × 180 × 120 mm, 3 kg, from a box spawner gated by the PLC (queue full = carton standing at `EyeFull` for 1 s) |
 | Photo-eyes | `EyeStop`, `EyeZone`, `EyeGate` (pick lane), `EyeHead` (queue head), `EyeFull`, `EyeB0`/`EyeB1` (drop zone on B) |
 | Operator | E-STOP (normally closed, `EStopOk`), START, stack light |
-| Robot | `parts/delta.transfer-robot`, our own generic delta built from primitives (no mesh, 34 links) |
+| Robot | `parts/delta.transfer-robot`, our own procedural model of a generic delta in an aluminium-profile portal (Draco GLB, 0.18 MB part) |
 
 ### The robot part
 
 ![The delta over the pick point](docs/robot.png)
+
+The model (`tools/model.mjs`, no vendor model or CAD) has a cast base housing with three drive units (gearbox and
+servo motor) under it, tapered cast upper arms with a lightening slot and ball studs on a cross shaft, carbon forearm
+pairs with polymer socket cups and two tension springs per pair, a triangular effector with ball studs, and a vacuum
+tool with four bellows cups. The portal is 80 × 80 slot profile (T-slots, centre bore, end caps) with cast corner
+brackets, foot plates and levelling feet; the robot hangs from two carrier profiles. Every dimension the kinematics use
+is read from the behavior, so the model cannot drift from it.
+
+![Profile frame corner](docs/frame.png)
 
 The robot is a rig part. Every tick it turns the TCP into three motor angles (rotary delta, Clavel type, elbow-out
 branch) and poses every moving link from the result: the upper arms turn about their motor axes, each forearm is two
@@ -95,9 +104,9 @@ node $P/tools/check_kin.mjs        # delta kinematics: loop closure and joint ra
 | `safety` | E-stop mid-transfer (OIP `sensorStuck` fault on the NC contact): the robot holds its TCP to ±0.5 mm and keeps the carton, belts and feed stop, the light turns red; releasing the E-stop keeps everything stopped (amber); START resumes and picking continues |
 
 `tools/check_kin.mjs` solves the kinematics on a grid over the working volume (both belts, ±200 mm along them,
-carton top to above the travel height) and at every millisecond of every move of the cycle: every forearm must close
-to 900 mm (worst error 0 nm in 3980 poses) and the motor angles stay in −17.5…75.2°. It fails when the rod length is
-off by 1 mm.
+carton top to above the travel height) and at every millisecond of every move of the cycle. Both ends of every rod,
+as drawn, must sit on their ball studs (worst error 0 nm in 3980 poses) and the motor angles stay in −17.5…75.2°. It
+fails when the ball-stud spacing is off by 1 %.
 
 `tools/perturb.sh` runs the suite on two mutants of the program. With the escapement interlock removed, three tests
 fail. With the restart lock removed (`RobotEnable` following the E-stop contact), `safety` fails. The script exits 0
@@ -113,7 +122,7 @@ These are OIP's own physics (Jolt) and PLC engine. Nothing here is physically va
 
 | Script | Does |
 |---|---|
-| `tools/build_part.mjs` | write the delta part's manifest (all primitives); rest poses come from the behavior's own kinematics |
+| `tools/make_part.sh` | `model.mjs` (our procedural GLB) → weld + Draco → `build_part.mjs` (manifest, model embedded, rest poses from the behavior's kinematics) → `check-part` |
 | `tools/check_kin.mjs` | the kinematics check above |
 | `tools/build_scene.sh` | lay the whole scene out with OIP's `add-part` (every parameter checked), bind `plc/` and `tests/` |
 | `tools/scene_file.mjs` | write `dist/delta-cell.scene.json`, the one-file scene for Import Project |
@@ -129,5 +138,5 @@ The scripts expect the OIP checkout at `~/code/_vendor/open-industry-project`; s
 
 - `parts/oip.*` are the project's copies of OIP built-in parts, MIT © Automation Standard LLC and Contributors, see
   [`parts/LICENSE-OIP`](parts/LICENSE-OIP).
-- The robot is our own generic delta built from boxes and cylinders. No vendor model or CAD is used here.
+- The robot and frame are our own procedural models of a generic delta and a generic slot-profile frame. No vendor model or CAD is used here.
 - This project is not affiliated with any robot maker or with Open Industry Project.

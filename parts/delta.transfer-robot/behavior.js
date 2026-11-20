@@ -15,6 +15,7 @@
 
 // ---------------------------------------------------------------- geometry
 const R = 0.200, r = 0.060, L1 = 0.380, L2 = 0.900, ZM = 1.200, TOOL = 0.100, W = 0.030
+const SPRING = 0.075                                       // the rod-pair springs sit this far from each ball
 const PHI = [90, 210, 330].map((d) => d * Math.PI / 180)
 const U = PHI.map((f) => [Math.cos(f), 0, Math.sin(f)])     // radial direction of each arm
 const V = PHI.map((f) => [-Math.sin(f), 0, Math.cos(f)])    // its motor axis (horizontal, tangent)
@@ -47,27 +48,25 @@ function ik(tcp) {
   return th
 }
 
-// every moving link's pose for a TCP and its joint angles
+// every moving link's pose for a TCP and its joint angles. Link frames (as modelled in tools/model.mjs): an upper arm
+// on its motor axis (X along the arm, Z the motor axis), a rod on its centre (Y along it, ball centres at +-L2/2), a
+// spring on its centre (Z across the rod pair), the effector on its plate centre (the tool hangs TOOL below it)
 function poses(tcp, th) {
   const P = [tcp[0], tcp[1] + TOOL, tcp[2]], out = {}
   for (let i = 0; i < 3; i++) {
     const B = add([0, ZM, 0], U[i], R)
     const c = Math.cos(th[i]), X = [c * U[i][0], -Math.sin(th[i]), c * U[i][2]]   // along the upper arm
-    const E = add(B, X, L1), J = add(P, U[i], r)
-    out[`upper${i}`] = { position: add(B, X, L1 / 2), quat: quatOf(X, cross(V[i], X), V[i]) }
-    out[`elbow${i}`] = { position: E, quat: quatOf(U[i], [0, 1, 0], V[i]) }
-    out[`ebar${i}`] = { position: J, quat: quatOf(U[i], [0, 1, 0], V[i]) }
-    for (const [s, n] of [[-1, 'a'], [1, 'b']]) {
-      const e = add(E, V[i], s * W), j = add(J, V[i], s * W)
-      out[`rod${i}${n}`] = { position: add(e, add(j, e, -1), 0.5), quat: alongY(add(e, j, -1), V[i]) }
-    }
+    const E = add(B, X, L1), J = add(P, U[i], r), d = unit(add(J, E, -1))
+    out[`upper${i}`] = { position: B, quat: quatOf(X, cross(V[i], X), V[i]) }
+    const q = alongY(d, V[i])
+    for (const [s, n] of [[-1, 'a'], [1, 'b']]) out[`rod${i}${n}`] = { position: add(add(E, V[i], s * W), d, L2 / 2), quat: q }
+    const qs = quatOf(U[i], [0, 1, 0], V[i])
+    out[`spring${i}t`] = { position: add(E, d, SPRING), quat: qs }
+    out[`spring${i}b`] = { position: add(J, d, -SPRING), quat: qs }
   }
-  const at = (dy) => ({ position: [tcp[0], tcp[1] + dy, tcp[2]] })
-  out.effector = at(TOOL)
-  out.shaft = at(0.055)
-  out.pad = at(0.0125)
-  out.vacLed = { position: [tcp[0] + 0.045, tcp[1] + 0.05, tcp[2] + 0.045] }
-  out.gripper = at(0)
+  out.effector = { position: P }
+  out.vacLed = { position: [tcp[0] + 0.037, tcp[1] + 0.043, tcp[2]] }
+  out.gripper = { position: [tcp[0], tcp[1], tcp[2]] }
   return out
 }
 

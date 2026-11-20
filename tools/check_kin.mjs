@@ -1,13 +1,18 @@
 // Kinematics check of the delta part: on a grid over the working volume and along every planned move of the cycle,
-// the inverse kinematics must close the loop (each forearm rod exactly L2 long, the upper arm exactly L1 from its
-// motor axis) and stay inside the joint range. Exits 1 on any failure.   Usage: node tools/check_kin.mjs
+// the posed links must close the loop (both ends of every forearm rod on its ball studs, the upper arm on its
+// motor axis) and the joints stay inside their range. Exits 1 on any failure.   Usage: node tools/check_kin.mjs
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'parts/delta.transfer-robot/behavior.js'), 'utf8')
 let spec = null
-const k = new Function('definePart', `${src}\nreturn { ik, poses, plan, planAt, add, R, L1, L2, ZM, U, W }`)((s) => { spec = s })
+const k = new Function('definePart', `${src}\nreturn { ik, poses, plan, planAt, add, R, r, L1, L2, ZM, U, V, W }`)((s) => { spec = s })
+// rotate v by the unit quaternion q = [x, y, z, w]
+function rot(q, v) {
+  const [x, y, z, w] = q, t = [2 * (y * v[2] - z * v[1]), 2 * (z * v[0] - x * v[2]), 2 * (x * v[1] - y * v[0])]
+  return [v[0] + w * t[0] + y * t[2] - z * t[1], v[1] + w * t[1] + z * t[0] - x * t[2], v[2] + w * t[2] + x * t[1] - y * t[0]]
+}
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], len = (a) => Math.hypot(...a)
 const LO = -20 * Math.PI / 180, HI = 80 * Math.PI / 180  // joint range checked (rad)
 let n = 0, worst = 0, minTh = 9, maxTh = -9
@@ -19,11 +24,19 @@ function check(tcp, where) {
   for (let i = 0; i < 3; i++) {
     minTh = Math.min(minTh, th[i]); maxTh = Math.max(maxTh, th[i])
     if (th[i] < LO || th[i] > HI) fail.push(`${where}: arm ${i} at ${(th[i] * 180 / Math.PI).toFixed(1)} deg`)
-    const B = k.add([0, k.ZM, 0], k.U[i], k.R), E = p[`elbow${i}`].position
-    worst = Math.max(worst, Math.abs(len(sub(E, B)) - k.L1))
-    // rod ends: the rod is a cylinder of height L2 centred on its position along its local Y
-    const P = [tcp[0], tcp[1] + 0.1, tcp[2]], J = k.add(P, k.U[i], 0.06)
-    worst = Math.max(worst, Math.abs(len(sub(E, J)) - k.L2))
+    // the posed links, as drawn: the upper arm's ball studs (its frame: motor axis, X along the arm, Z the axis),
+    // each rod's two ends (centre +- L2/2 along its Y) and the effector's ball studs must coincide
+    const up = p[`upper${i}`], B = k.add([0, k.ZM, 0], k.U[i], k.R)
+    worst = Math.max(worst, len(sub(up.position, B)))
+    const tip = k.add(up.position, rot(up.quat, [1, 0, 0]), k.L1)
+    const Pc = p.effector.position
+    for (const [s, n] of [[-1, 'a'], [1, 'b']]) {
+      const rd = p[`rod${i}${n}`], ax = rot(rd.quat, [0, 1, 0])
+      const top = k.add(rd.position, ax, -k.L2 / 2), bot = k.add(rd.position, ax, k.L2 / 2)
+      const ballUp = k.add(tip, rot(up.quat, [0, 0, 1]), s * k.W)
+      const ballEff = k.add(k.add(Pc, k.U[i], k.r), k.V[i], s * k.W)
+      worst = Math.max(worst, len(sub(top, ballUp)), len(sub(bot, ballEff)))
+    }
   }
   n++
 }

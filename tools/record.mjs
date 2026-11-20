@@ -78,6 +78,10 @@ try {
         await shot('cell_running.png')
         await cam(-2.0, 0.12, 2.4, [0.0, 1.45, 0]); await wait(2200)
         await shot('robot_pick.png')
+        await cam(-2.6, 0.25, 0.75, [-0.8, 2.2, -0.72]); await wait(1500)
+        await shot('frame_corner.png')
+        await cam(-2.6, 0.30, 0.6, [-0.8, 0.12, -0.72]); await wait(1500)
+        await shot('frame_foot.png')
         console.log('PLC tags:', await page.evaluate(() => {
                 const g = __oip.controller.plcGlobalTags ?? {}
                 return { Picked: g.Picked, Delivered: g.Delivered, Step: g.Step, StackLight: g.StackLight, ColumnAlarm: g.ColumnAlarm }
@@ -105,4 +109,4 @@ encode('delta_cell_oip.mp4', crop) // the 3D viewport only
 encode('delta_cell_oip_editor.mp4', 'scale=1600:-2') // the whole editor: scene tree, viewport, the PLC program running
 rmSync(vidDir, { recursive: true, force: true })
 console.log(`clip ${clipStart.toFixed(1)}-${clipEnd.toFixed(1)} s wall, raw ${dur.toFixed(1)} s, cut at ${ss.toFixed(1)} s`)
-for (const f of ['cell_iso.png', 'cell_running.png', 'robot_pick.png', 'delta_cell_oip.mp4', 'delta_cell_oip_editor.mp4']) console.log(join(outDir, f))
+for (const f of ['cell_iso.png', 'cell_running.png', 'robot_pick.png', 'frame_corner.png', 'frame_foot.png', 'delta_cell_oip.mp4', 'delta_cell_oip_editor.mp4']) console.log(join(outDir, f))
