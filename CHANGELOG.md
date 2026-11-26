@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-26
+
+### Changed
+- Moved to [sergiudanstan/oip-cells](https://github.com/sergiudanstan/oip-cells) (`cells/delta/`, history preserved); this repository is archived. README points to the new location, and the old Pages index redirects to https://sergiudanstan.github.io/oip-cells/delta/.
+
 ## [0.1.0] - 2026-11-25
 
 First tagged release. The delta transfer cell for [Open Industry Project](https://openindustryproject.org): a three-arm delta robot in a portal frame moving cartons from an infeed belt to an outfeed belt, with its PLC program and tests.
